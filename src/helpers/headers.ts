@@ -13,6 +13,7 @@ function normalizeHeaderName(headers: any, normalizedName: string): void {
   })
 }
 
+// 处理请求 headers
 export function processHeaders(headers: any, data: any): any {
   normalizeHeaderName(headers, 'Content-Type')
 
@@ -23,4 +24,26 @@ export function processHeaders(headers: any, data: any): any {
   }
 
   return headers
+}
+
+// 处理响应 headers 将其转为对象
+export function parseHeaders(headers: string): any {
+  let parsed = Object.create(null)
+  if (!headers) {
+    return parsed
+  }
+
+  headers.split('\r\n').forEach(line => {
+    let [key, val] = line.split(':')
+    key = key.trim().toLowerCase()
+    if (!key) {
+      return
+    }
+    if (val) {
+      val = val.trim()
+    }
+    parsed[key] = val
+  })
+
+  return parsed
 }

@@ -1,16 +1,39 @@
 import { AxiosRequestConfig, AxiosPromise, AxiosResponse } from './types'
 import { parseHeaders } from './helpers/headers'
+import { createError } from './helpers/error'
 
 // 发送 ajax 请求
 export default function xhr(config: AxiosRequestConfig): AxiosPromise {
   // promise 化
-  return new Promise(resolve => {
-    const { url, method = 'GET', data = null, headers, responseType } = config
+  return new Promise((resolve, reject) => {
+    const { url, method = 'GET', data = null, headers, responseType, timeout } = config
+
+    // request.status 判断函数
+    function handleResponse(response: AxiosResponse): void {
+      if (response.status >= 200 && response.status < 300) {
+        resolve(response)
+      } else {
+        reject(
+          createError(
+            `Request failed with status code ${response.status}`,
+            config,
+            null,
+            request,
+            response
+          )
+        )
+      }
+    }
 
     const request = new XMLHttpRequest()
 
     if (responseType) {
       request.responseType = responseType
+    }
+
+    // 设置超时时间
+    if (timeout) {
+      request.timeout = timeout
     }
 
     request.open(method.toUpperCase(), url, true)
@@ -28,6 +51,11 @@ export default function xhr(config: AxiosRequestConfig): AxiosPromise {
         return
       }
 
+      // 增加对 request.status 的判断，当出现网络错误或者超时错误的时候，该值都为 0
+      if (request.status === 0) {
+        return
+      }
+
       // 组装响应数据
       const responseHeaders = parseHeaders(request.getAllResponseHeaders())
       const responseData =
@@ -41,7 +69,18 @@ export default function xhr(config: AxiosRequestConfig): AxiosPromise {
         request
       }
 
-      resolve(response)
+      // 对 request.status 的值再次判断
+      handleResponse(response)
+    }
+
+    // 处理网络异常错误
+    request.onerror = function handleError() {
+      reject(createError('Network Error', config, null, request))
+    }
+
+    // 处理超时错误
+    request.ontimeout = function handleTimeout() {
+      reject(createError(`Timeout of ${timeout} ms exceeded`, config, 'ECONNABORTED', request))
     }
 
     // 处理请求 headers
